@@ -7,6 +7,7 @@ The EBS then sends the message `pong` via PubSub with the EBS-signed JWT in the 
 
 ## Requirements
 - Go 1.10+ with [`dep`](https://github.com/golang/dep) for package management. 
+- OpenSSL. If on Windows, you can install Git which bundles it.  
 
 ## Installation 
 The recommended path to using this sample is with the [Developer Rig](https://github.com/twitchdev/developer-rig).
@@ -17,7 +18,6 @@ The recommended path to using this sample is with the [Developer Rig](https://gi
 `dep ensure`
 3. Generate certs for the EBS:
 `openssl req -nodes -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days XXX -subj '/CN=localhost'`
-If on Windows, you can install Git which includes OpenSSL.  
 4. Set `clientID` and `ownerID` variables in `main.go`
 
 
