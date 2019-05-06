@@ -1,6 +1,8 @@
 # bits-fireworks
 An extension that demonstrates how to leverage [Bits](https://dev.twitch.tv/docs/extensions/monetization/) as a monetization mechanism.  
 
+![](fireworks.gif)
+
 ## What's in the sample
 The video-overlay extension allows viewers to spend Bits and trigger a fireworks animation on stream in return. When the broadcaster configures the extension, they select which of the two fireworks types they want to enable: Small (10 Bits) or Large (100 Bits).
 
