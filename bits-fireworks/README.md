@@ -19,8 +19,7 @@ The extension uses the [Configuration Service](https://dev.twitch.tv/docs/extens
 | Small Fireworks  | small_fireworks_10  | 10               | Yes            | Yes       |
 | Large Fireworks  | large_fireworks_100 | 100              | Yes            | Yes       |
 
-3. Clone the repo:
-`go get github.com/twitchdev/extensions-samples/bits-fireworks` 
+3. Clone the repo under your `$GOPATH/src` directory.
 4. Navigate to the `ebs` directory; usually this would be `$GOPATH/src/github.com/twitchdev/extensions-samples/bits-fireworks/ebs`.
 4. Install the dependencies:
 `dep ensure`
