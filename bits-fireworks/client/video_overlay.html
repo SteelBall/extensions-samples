@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"></script>
+  <script src="js/extension.js"></script>
+  <script src="js/fireworks.js"></script>
+  <script src="js/jquery.js"></script>
+
+  <link href="https://fonts.googleapis.com/css?family=Press+Start+2P" rel="stylesheet">
+  <link href="css/nes.css" rel="stylesheet">
+  <link href="css/styles.css" rel="stylesheet">
+</head>
+
+<body>
+  <aside id="library">
+    <img src="/images/big-glow.png" id="big-glow" />
+    <img src="/images/small-glow.png" id="small-glow" />
+  </aside>
+  <script type="text/javascript">
+    var twitch = window.Twitch ? window.Twitch.ext : null;
+    var useBits = null; 
+
+    (function() {  
+      var channelId = "";
+      var sku = "";
+
+      if(!twitch){
+        return;
+      }
+
+      twitch.onAuthorized(function (auth) {
+        channelId = auth.channelId;
+        log("onAuthorized() fired, running on channel: " + channelId);
+      });
+
+      twitch.configuration.onChanged(function () {
+        sku = twitch.configuration.broadcaster ? twitch.configuration.broadcaster.content : "";
+        log("onChanged() fired, previously broadcaster-selected sku: " + sku)
+      });
+
+      twitch.bits.onTransactionComplete(function (transaction) {
+        log("onTransactionComplete() fired, received transactionReceipt: " + transaction.transactionReceipt);
+        fetch("https://localhost:8080/api/fireworks", {
+          method: "POST",
+          headers: {
+            "Authorization": "Bearer " + transaction.transactionReceipt,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ channelId: channelId })
+        }).then(function (response) {
+          if (response.ok) {
+            log("ebs validated transaction")
+          }
+          else {
+            log("ebs was unable to validate transaction")
+          }
+        });
+      });
+
+      twitch.listen('broadcast', function (topic, contentType, sku) {
+        log("listen() fired, received sku via PubSub: " + sku + ". Shooting Fireworks!");
+        launchFireworks(sku);
+      });
+
+      useBits = function() {
+        if (sku == "") {
+          log("no sku received from the configuration svc");
+          return
+        }
+        twitch.bits.useBits(sku);
+      }
+    })()
+
+  </script>
+  <div class="content">
+    <button type="button" class="nes-btn is-primary" id="fireworksBtn" onclick="useBits()">
+      Launch Fireworks!
+    </button>
+  </div>
+</body>
+
+</html>
