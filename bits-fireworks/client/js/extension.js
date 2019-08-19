@@ -19,6 +19,16 @@ log = function () {
     return Function.prototype.bind.call(console.log, console, prefix);
 }();
 
+compare = function(a, b) {
+    if (a.displayName > b.displayName) {
+        return -1;
+    }
+    if (a.displayName < b.displayName) {
+        return 1;
+    }
+    return 0;
+}
+
 window.requestAnimFrame = (function () {
     return window.requestAnimationFrame ||
         window.webkitRequestAnimationFrame ||
