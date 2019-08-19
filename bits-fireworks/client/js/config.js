@@ -23,6 +23,20 @@ var twitch = window.Twitch ? window.Twitch.ext : null;
         return;
     }
 
+    window.onload = function () {
+        document.getElementById('saveBtn').addEventListener('click', function () {
+            var radioBtns = document.getElementsByName('firework');
+
+            for (var i = 0, length = radioBtns.length; i < length; i++) {
+                if (radioBtns[i].checked) {
+                    twitch.configuration.set("broadcaster", "", radioBtns[i].id);
+                    log("saveSettings() fired, broadcaster-selected sku set to: " + radioBtns[i].id);
+                    break;
+                }
+            }
+        });
+    }  
+
     twitch.configuration.onChanged(function () {
         sku = twitch.configuration.broadcaster ? twitch.configuration.broadcaster.content : ""
         log("onChanged() fired, previously broadcaster-selected sku: " + sku)
@@ -35,7 +49,6 @@ var twitch = window.Twitch ? window.Twitch.ext : null;
         for (var i = 0; i < products.length; i++) {
             var radioBtn = '<label><input type="radio" class="nes-radio is-dark" name="firework" id="' + products[i].sku + '" /><span>' + products[i].displayName + '</span></label>';
             elementsToRender.push(radioBtn);
-            log(radioBtn)
         }
         $("#configuration").after(elementsToRender);
 
@@ -45,26 +58,3 @@ var twitch = window.Twitch ? window.Twitch.ext : null;
         }
     });
 })()
-
-function saveSettings() {
-    var radioBtns = document.getElementsByName('firework');
-
-    for (var i = 0, length = radioBtns.length; i < length; i++) {
-        if (radioBtns[i].checked) {
-            twitch.configuration.set("broadcaster", "", radioBtns[i].id);
-            log("saveSettings() fired, broadcaster-selected sku set to: " + radioBtns[i].id);
-            break;
-        }
-    }
-}
-
-function compare(a, b) {
-    if (a.displayName > b.displayName) {
-        return -1;
-    }
-    if (a.displayName < b.displayName) {
-        return 1;
-    }
-
-    return 0;
-}

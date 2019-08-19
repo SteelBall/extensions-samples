@@ -91,20 +91,19 @@ func parseArgs() (clientID string, ownerID string, secret []byte) {
 }
 
 func main() {
-	//os.Setenv("HTTP_PROXY", "http://localhost:8888")
-
 	svc := newService(parseArgs())
 	r := mux.NewRouter()
 
 	s := r.PathPrefix("/api").Subrouter()
 	s.HandleFunc("/fireworks", svc.fireworksHandler).Methods("POST")
+	s.Use(svc.verifyAuthJWT)
 	s.Use(svc.verifyBitsJWT)
 
 	// Serve frontend assets
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("../client/")))
 
-	log.Println("Starting server on https://localhost:8080/")
-	log.Fatal(http.ListenAndServeTLS(":8080", "server.crt", "server.key", handlers.CORS(handlers.AllowedHeaders([]string{authHeaderName}))(r)))
+	log.Println("Starting server on http://localhost:8080/")
+	log.Fatal(http.ListenAndServe(":8080", handlers.CORS(handlers.AllowedHeaders([]string{authHeaderName}))(r)))
 }
 
 // newService creates an instance of our service data that stores the secret and JWT parser
@@ -120,26 +119,10 @@ func newService(clientID string, ownerID string, secret []byte) *service {
 
 // fireworksHandler verifies the Bits transaction JWT and sends out purchased Bits SKU via PubSub
 func (s *service) fireworksHandler(w http.ResponseWriter, r *http.Request) {
-	b, err := ioutil.ReadAll(r.Body)
-	defer r.Body.Close()
-	if err != nil {
-		log.Println("Missing Channel ID")
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	authClaims := getAuthClaims(r)
+	bitsClaims := getBitsClaims(r)
 
-	var body struct {
-		ChannelID string `json:"channelId"`
-	}
-	err = json.Unmarshal(b, &body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	claims := getClaims(r)
-
-	s.send(body.ChannelID, claims.Data.Product.Sku)
+	s.send(authClaims.ChannelID, bitsClaims.Data.Product.Sku)
 	w.Write([]byte(http.StatusText(http.StatusOK)))
 }
 
@@ -149,6 +132,44 @@ func (s *service) getKey(*jwt.Token) (interface{}, error) {
 
 // verifyBitsJWT is middleware that confirms the validity of incoming requests
 func (s *service) verifyBitsJWT(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, err := ioutil.ReadAll(r.Body)
+		defer r.Body.Close()
+		if err != nil {
+			log.Println("Missing Channel ID")
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		var body struct {
+			TransactionToken string `json:"token"`
+		}
+		err = json.Unmarshal(b, &body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		parsedToken, err := s.parser.ParseWithClaims(body.TransactionToken, &jwtBitsClaims{}, s.getKey)
+
+		if err != nil {
+			log.Println(err)
+			http.Error(w, "Could not parse Bits transaction token", http.StatusInternalServerError)
+			return
+		}
+
+		if claims, ok := parsedToken.Claims.(*jwtBitsClaims); ok && parsedToken.Valid {
+			next.ServeHTTP(w, setBitsClaims(r, claims))
+		} else {
+			log.Println("Could not parse Bits JWT claims")
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return
+		}
+	})
+}
+
+// verifyBitsJWT is middleware that confirms the validity of incoming requests
+func (s *service) verifyAuthJWT(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var token string
 
@@ -173,7 +194,7 @@ func (s *service) verifyBitsJWT(next http.Handler) http.Handler {
 		}
 		token = strings.TrimPrefix(token, authHeaderPrefix)
 
-		parsedToken, err := s.parser.ParseWithClaims(token, &jwtBitsClaims{}, s.getKey)
+		parsedToken, err := s.parser.ParseWithClaims(token, &jwtAuthClaims{}, s.getKey)
 
 		if err != nil {
 			log.Println(err)
@@ -181,10 +202,10 @@ func (s *service) verifyBitsJWT(next http.Handler) http.Handler {
 			return
 		}
 
-		if claims, ok := parsedToken.Claims.(*jwtBitsClaims); ok && parsedToken.Valid {
-			next.ServeHTTP(w, setClaims(r, claims))
+		if claims, ok := parsedToken.Claims.(*jwtAuthClaims); ok && parsedToken.Valid {
+			next.ServeHTTP(w, setAuthClaims(r, claims))
 		} else {
-			log.Println("Could not parse JWT claims")
+			log.Println("Could not parse auth JWT claims")
 			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 			return
 		}
@@ -195,7 +216,7 @@ func (s *service) verifyBitsJWT(next http.Handler) http.Handler {
 func (s *service) newJWT(channelID string) string {
 	var expiration = time.Now().Add(time.Minute * 3).Unix()
 
-	claims := jwtClaims{
+	claims := jwtAuthClaims{
 		UserID:    s.ownerID,
 		ChannelID: channelID,
 		Role:      "external",

@@ -23,10 +23,10 @@ import (
 	jwt "github.com/dgrijalva/jwt-go"
 )
 
+const jwtAuthClaimsKey contextKeyType = "jwtAuthClaims"
 const jwtBitsClaimsKey contextKeyType = "jwtBitsClaims"
 
-// For EBS-signed JWTs
-type jwtClaims struct {
+type jwtAuthClaims struct {
 	OpaqueUserID string         `json:"opaque_user_id,omitempty"`
 	UserID       string         `json:"user_id"`
 	ChannelID    string         `json:"channel_id,omitempty"`
@@ -40,7 +40,6 @@ type jwtPermissions struct {
 	Listen []string `json:"listen,omitempty"`
 }
 
-// For Twitch-signed Bits transactions JWTs
 type jwtBitsClaims struct {
 	Topic string `json:"topic"`
 	Data  data   `json:"data"`
@@ -67,12 +66,24 @@ type cost struct {
 	Type   string `json:"type"`
 }
 
-func setClaims(r *http.Request, claims *jwtBitsClaims) *http.Request {
+func setAuthClaims(r *http.Request, claims *jwtAuthClaims) *http.Request {
+	ctx := context.WithValue(r.Context(), jwtAuthClaimsKey, claims)
+	return r.WithContext(ctx)
+}
+
+func getAuthClaims(r *http.Request) *jwtAuthClaims {
+	if claims, ok := r.Context().Value(jwtAuthClaimsKey).(*jwtAuthClaims); ok {
+		return claims
+	}
+	return &jwtAuthClaims{} // empty default
+}
+
+func setBitsClaims(r *http.Request, claims *jwtBitsClaims) *http.Request {
 	ctx := context.WithValue(r.Context(), jwtBitsClaimsKey, claims)
 	return r.WithContext(ctx)
 }
 
-func getClaims(r *http.Request) *jwtBitsClaims {
+func getBitsClaims(r *http.Request) *jwtBitsClaims {
 	if claims, ok := r.Context().Value(jwtBitsClaimsKey).(*jwtBitsClaims); ok {
 		return claims
 	}

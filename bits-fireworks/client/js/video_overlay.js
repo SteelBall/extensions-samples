@@ -18,52 +18,54 @@ var twitch = window.Twitch ? window.Twitch.ext : null;
 var useBits = null;
 
 (function () {
-    var channelId = "";
-    var sku = "";
+  var authToken = "";
+  var sku = "";
 
-    if (!twitch) {
-        return;
-    }
+  if (!twitch) {
+    return;
+  }
 
-    twitch.onAuthorized(function (auth) {
-        channelId = auth.channelId;
-        log("onAuthorized() fired, running on channel: " + channelId);
+  window.onload = function () {
+    document.getElementById('fireworksBtn').addEventListener('click', function () {
+      if (sku == "") {
+        log("no sku received from the configuration svc");
+        return
+      }
+      twitch.bits.useBits(sku);
     });
+  }
 
-    twitch.configuration.onChanged(function () {
-        sku = twitch.configuration.broadcaster ? twitch.configuration.broadcaster.content : "";
-        log("onChanged() fired, previously broadcaster-selected sku: " + sku)
+  twitch.onAuthorized(function (auth) {
+    authToken = auth.token;
+    log("onAuthorized() fired, running on channel: " + auth.channelId);
+  });
+
+  twitch.configuration.onChanged(function () {
+    sku = twitch.configuration.broadcaster ? twitch.configuration.broadcaster.content : "";
+    log("onChanged() fired, previously broadcaster-selected sku: " + sku)
+  });
+
+  twitch.bits.onTransactionComplete(function (transaction) {
+    log("onTransactionComplete() fired, received transactionReceipt: " + transaction.transactionReceipt);
+    fetch("http://localhost:8080/api/fireworks", {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + authToken,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ token: transaction.transactionReceipt })
+    }).then(function (response) {
+      if (response.ok) {
+        log("ebs validated transaction")
+      }
+      else {
+        log("ebs was unable to validate transaction")
+      }
     });
+  });
 
-    twitch.bits.onTransactionComplete(function (transaction) {
-        log("onTransactionComplete() fired, received transactionReceipt: " + transaction.transactionReceipt);
-        fetch("https://localhost:8080/api/fireworks", {
-            method: "POST",
-            headers: {
-                "Authorization": "Bearer " + transaction.transactionReceipt,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ channelId: channelId })
-        }).then(function (response) {
-            if (response.ok) {
-                log("ebs validated transaction")
-            }
-            else {
-                log("ebs was unable to validate transaction")
-            }
-        });
-    });
-
-    twitch.listen('broadcast', function (topic, contentType, sku) {
-        log("listen() fired, received sku via PubSub: " + sku + ". Shooting Fireworks!");
-        launchFireworks(sku);
-    });
-
-    useBits = function () {
-        if (sku == "") {
-            log("no sku received from the configuration svc");
-            return
-        }
-        twitch.bits.useBits(sku);
-    }
+  twitch.listen('broadcast', function (topic, contentType, sku) {
+    log("listen() fired, received sku via PubSub: " + sku + ". Shooting Fireworks!");
+    launchFireworks(sku);
+  });
 })()
